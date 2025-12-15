@@ -1,0 +1,55 @@
+services:
+  - type: web
+    name: ukc-frontend
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    branch: main
+    autoDeploy: true
+    rootDir: frontend
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://api.ukc.com
+
+  - type: web
+    name: ukc-api-gateway
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app
+    branch: main
+    autoDeploy: true
+    rootDir: task_router
+    healthCheckPath: /health
+    envVars:
+      - key: KAFKA_BROKERS
+        value: kafka-broker-internal:9092
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+  - type: web
+    name: ukc-knowledge-svc
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn knowledge_service.app.main:app --host 0.0.0.0 --port 10000
+    branch: main
+    autoDeploy: true
+    rootDir: knowledge_service
+    envVars:
+      - key: NEO4J_URI
+        value: neo4j://neo4j-host:7687
+      - key: LLM_API_KEY
+        sync: false
+
+  - type: worker
+    name: ukc-flight-agent
+    env: go
+    buildCommand: go build -o flight-agent ./cmd
+    startCommand: ./flight-agent
+    branch: main
+    autoDeploy: true
+    rootDir: task_agent_flight
+    envVars:
+      - key: KAFKA_TOPIC
+        value: task_queue_flight_search
+      - key: EXTERNAL_API_KEY_A
+        sync: false
